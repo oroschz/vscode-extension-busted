@@ -17,9 +17,11 @@
 		"vscode": "^1.66.0"
 	},
 	"categories": [
-		"Other"
+		"Testing"
 	],
-	"activationEvents": [],
+	"activationEvents": [
+		"onLanguage:lua"
+	],
 	"main": "./out/extension.js",
 	"contributes": {},
 	"scripts": {
