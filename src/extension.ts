@@ -125,9 +125,9 @@ export function activate(context: vscode.ExtensionContext) {
         if (!workspace) { return; }
 
         const options = { 'cwd': workspace.uri.path };
-        const process = spawn('busted', ['--list', test.uri.path], options);
+        const child = spawn('busted', ['--list', test.uri.path], options);
 
-        process.stdout.on('data', data => {
+        child.stdout.on('data', data => {
             const text = String.fromCharCode(...data).trim();
             text.split('\n').forEach(line => getTestCase(line, test));
         });
