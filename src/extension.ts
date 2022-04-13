@@ -98,11 +98,15 @@ export function activate(context: vscode.ExtensionContext) {
         return [row, name];
     };
 
+    const getTestCaseId = (uri: vscode.Uri, name: string) => {
+        return uri.path.trim() + ":" + name.trim();
+    };
+
     // Generate test cases given an output line from the list command.
     const getTestCase = (text: string, test: vscode.TestItem) => {
 
         const [row, label] = parseMatch(text);
-        const testId = test.uri!.path + ":" + label;
+        const testId = getTestCaseId(test.uri!, label);
 
         const existing = test.children.get(testId);
         if (existing) { return; }
