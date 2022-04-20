@@ -19,9 +19,11 @@
 	"categories": [
 		"Testing"
 	],
+	"icon": "images/icon.png",
 	"activationEvents": [
 		"onLanguage:lua"
 	],
+	"preview": true,
 	"main": "./dist/src/extension.js",
 	"contributes": {},
 	"scripts": {
