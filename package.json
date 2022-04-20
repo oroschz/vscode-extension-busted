@@ -2,7 +2,7 @@
 	"name": "busted-tests",
 	"displayName": "Busted Tests",
 	"description": "Run your busted test suite from Visual Studio Code.",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"author": {
 		"name": "Orlando Ospino Sánchez",
 		"email": "oroschz@outlook.com"
@@ -11,16 +11,20 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/oroschz/busted-tests.git"
+		"url": "https://github.com/oroschz/vscode-busted.git"
 	},
 	"engines": {
 		"vscode": "^1.66.0"
 	},
 	"categories": [
-		"Other"
+		"Testing"
 	],
-	"activationEvents": [],
-	"main": "./out/extension.js",
+	"icon": "images/icon.png",
+	"activationEvents": [
+		"onLanguage:lua"
+	],
+	"preview": true,
+	"main": "./dist/src/extension.js",
 	"contributes": {},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -28,7 +32,7 @@
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
-		"test": "node ./out/test/runTest.js"
+		"test": "node ./dist/tests/runTest.js"
 	},
 	"devDependencies": {
 		"@types/vscode": "^1.66.0",
