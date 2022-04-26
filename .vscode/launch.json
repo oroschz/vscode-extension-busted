@@ -23,10 +23,10 @@
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-				"--extensionTestsPath=${workspaceFolder}/dist/tests/suite/index"
+				"--extensionTestsPath=${workspaceFolder}/dist/test/suite/index"
 			],
 			"outFiles": [
-				"${workspaceFolder}/dist/tests/**/*.js"
+				"${workspaceFolder}/dist/test/**/*.js"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
 		}
