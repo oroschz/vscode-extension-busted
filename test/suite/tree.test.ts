@@ -23,10 +23,10 @@ suite('createTestBranch', () => {
     });
 
     test('adds test cases to the test map', () => {
-        assert.isUndefined(findTestNode(vscode.Uri.file('/root')));
-        assert.isObject(findTestNode(vscode.Uri.file('/test1.lua')));
-        assert.isObject(findTestNode(vscode.Uri.file('/subspec')));
-        assert.isObject(findTestNode(vscode.Uri.file('/subspec/test2.lua')));
+        assert.isUndefined(testMap.get('/root'));
+        assert.isObject(testMap.get('/test1.lua'));
+        assert.isObject(testMap.get('/subspec'));
+        assert.isObject(testMap.get('/subspec/test2.lua'));
     });
 
     test('adds test cases to test tree', () => {
@@ -42,31 +42,22 @@ suite('createTestBranch', () => {
 suite('deleteTestNode', () => {
     const ctrlTest = vscode.tests.createTestController('busted', 'busted');
 
-    const testUri1 = vscode.Uri.file('/test1.lua');
-    const testNode1 = ctrlTest.createTestItem(testUri1.path, 'test1.lua', testUri1);
-    ctrlTest.items.add(testNode1);
+    createTestBranch(ctrlTest, '/', ['test1.lua']);
 
     test('removed test case from test tree', () => {
-        assert.isObject(ctrlTest.items.get(testUri1.path));
-        deleteTestNode(ctrlTest, testNode1);
-        assert.isUndefined(ctrlTest.items.get(testUri1.path));
+        assert.isObject(ctrlTest.items.get('/test1.lua'));
+        deleteTestNode(ctrlTest, testMap.get('/test1.lua')!);
+        assert.isUndefined(ctrlTest.items.get('/test1.lua'));
     });
 
-    const testUri2 = vscode.Uri.file('/spec');
-    const testNode2 = ctrlTest.createTestItem(testUri2.path, 'spec', testUri2);
-    ctrlTest.items.add(testNode2);
-    testMap.set(testUri2.path, testNode2);
-    const testUri3 = vscode.Uri.file('/spec/test2.lua');
-    const testNode3 = ctrlTest.createTestItem(testUri3.path, 'test2.lua', testUri3);
-    testMap.set(testUri3.path, testNode3);
-    testNode2.children.add(testNode3);
+    createTestBranch(ctrlTest, '/', ['spec', 'test2.lua']);
 
     test('removes children cases from test map', () => {
-        assert.isObject(findTestNode(testUri2));
-        assert.isObject(findTestNode(testUri3));
-        deleteTestNode(ctrlTest, testNode2);
-        assert.isUndefined(findTestNode(testUri2));
-        assert.isUndefined(findTestNode(testUri3));
+        assert.isObject(testMap.get('/spec'));
+        assert.isObject(testMap.get('/spec/test2.lua'));
+        deleteTestNode(ctrlTest, testMap.get('/spec')!);
+        assert.isUndefined(testMap.get('/spec'));
+        assert.isUndefined(testMap.get('/spec/test2.lua'));
     });
 
     ctrlTest.dispose();
