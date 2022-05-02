@@ -23,25 +23,34 @@ export function createTestBranch(
     ctrlTest: vscode.TestController,
     root: string,
     tokens: string[],
-    group?: vscode.TestItemCollection,
-    index?: number
+    parent?: vscode.TestItem,
 ): vscode.TestItem {
 
-    index = index ?? 0;
-    group = group ?? ctrlTest.items;
+    const testId = path.join(parent?.uri?.path ?? root, tokens[0]);
+    const testItem = getOrCreateTest(ctrlTest, testId, tokens[0], parent);
 
-    const scope = tokens.slice(0, index + 1);
-    const testId = path.join(root, ...scope);
-    let testItem = group.get(testId);
-    if (!testItem) {
-        const testName = tokens[index];
-        const testUri = vscode.Uri.file(testId);
-        testItem = ctrlTest.createTestItem(testId, testName, testUri);
-        testMap.set(testId, testItem);
-        group.add(testItem);
-    }
-    if (index === tokens.length - 1) { return testItem; }
-    return createTestBranch(ctrlTest, root, tokens, testItem.children, index + 1);
+    if (tokens.length <= 1) { return testItem; }
+    return createTestBranch(ctrlTest, root, tokens.slice(1), testItem);
+}
+
+function getOrCreateTest(
+    ctrlTest: vscode.TestController,
+    id: string,
+    name: string,
+    parent?: vscode.TestItem
+) {
+    const collection = parent?.children ?? ctrlTest.items;
+
+    const existing = collection.get(id);
+    if (existing) { return existing; }
+
+    const testUri = vscode.Uri.file(id);
+    const testItem = ctrlTest.createTestItem(id, name, testUri);
+
+    testMap.set(id, testItem);
+    collection.add(testItem);
+
+    return testItem;
 }
 
 export function findTestNode(uri: vscode.Uri) {
