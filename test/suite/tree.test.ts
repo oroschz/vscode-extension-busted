@@ -1,11 +1,11 @@
-import * as assert from 'assert';
 import * as vscode from 'vscode';
+import { assert } from 'chai';
 import { findTestNode, createTestBranch, deleteTestNode } from '../../src/tree';
 
 suite('findTestNode', () => {
     test('returns undefined when there are not tests', () => {
         const result = findTestNode(vscode.Uri.file('/'));
-        assert.ifError(result);
+        assert.isUndefined(result);
     });
 });
 
@@ -14,27 +14,26 @@ suite('createTestBranch', () => {
 
     test('works on plain test cases', () => {
         const result = createTestBranch(ctrlTest, '/', ['test1.lua']);
-        assert.ok(result);
+        assert.isObject(result);
     });
 
     test('works on nested test cases', () => {
         const result = createTestBranch(ctrlTest, '/', ['subspec', 'test2.lua']);
-        assert.ok(result);
+        assert.isOk(result);
     });
 
     test('adds test cases to the test map', () => {
-        assert.ifError(findTestNode(vscode.Uri.file('/root')));
-        assert.ok(findTestNode(vscode.Uri.file('/test1.lua')));
-        assert.ok(findTestNode(vscode.Uri.file('/subspec')));
-        assert.ok(findTestNode(vscode.Uri.file('/subspec/test2.lua')));
+        assert.isUndefined(findTestNode(vscode.Uri.file('/root')));
+        assert.isObject(findTestNode(vscode.Uri.file('/test1.lua')));
+        assert.isObject(findTestNode(vscode.Uri.file('/subspec')));
+        assert.isObject(findTestNode(vscode.Uri.file('/subspec/test2.lua')));
     });
 
     test('adds test cases to test tree', () => {
-        assert.ifError(ctrlTest.items.get('/root'));
-        assert.ok(ctrlTest.items.get('/test1.lua'));
+        assert.isUndefined(ctrlTest.items.get('/root'));
+        assert.isObject(ctrlTest.items.get('/test1.lua'));
         const subspec = ctrlTest.items.get('/subspec');
-        assert.ok(subspec);
-        assert.ok(subspec.children?.get('/subspec/test2.lua'));
+        assert.isObject(subspec?.children?.get('/subspec/test2.lua'));
     });
 
     ctrlTest.dispose();
@@ -48,9 +47,9 @@ suite('deleteTestNode', () => {
     ctrlTest.items.add(testNode1);
 
     test('removed test case from test tree', () => {
-        assert.ok(ctrlTest.items.get(testUri1.path));
+        assert.isObject(ctrlTest.items.get(testUri1.path));
         deleteTestNode(ctrlTest, testNode1);
-        assert.ifError(ctrlTest.items.get(testUri1.path));
+        assert.isUndefined(ctrlTest.items.get(testUri1.path));
     });
 
     ctrlTest.dispose();
