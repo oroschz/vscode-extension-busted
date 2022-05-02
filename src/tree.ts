@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-const testMap = new Map<string, vscode.TestItem>();
+export const testMap = new Map<string, vscode.TestItem>();
 
 export function createTestNode(
     ctrlTest: vscode.TestController,
@@ -62,17 +62,15 @@ export function deleteTestNode(
     ctrlTest: vscode.TestController,
     test: vscode.TestItem
 ) {
-    const testId = test.uri!.path;
-    if (!test.parent) { return ctrlTest.items.delete(testId); }
+    const collection = test.parent?.children ?? ctrlTest.items;
 
-    test.parent.children.delete(testId);
-    testMapCleanup(test);
+    collection.delete(test.id);
+    removeFromTestMap(test);
 }
 
-function testMapCleanup(
+function removeFromTestMap(
     test: vscode.TestItem
 ) {
     testMap.delete(test.id);
-    if (!test.canResolveChildren) { return; }
-    test.children.forEach(child => testMapCleanup(child));
+    test.children.forEach(child => removeFromTestMap(child));
 }

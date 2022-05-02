@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { assert } from 'chai';
-import { findTestNode, createTestBranch, deleteTestNode } from '../../src/tree';
+import { findTestNode, createTestBranch, deleteTestNode, testMap } from '../../src/tree';
 
 suite('findTestNode', () => {
     test('returns undefined when there are not tests', () => {
@@ -50,6 +50,23 @@ suite('deleteTestNode', () => {
         assert.isObject(ctrlTest.items.get(testUri1.path));
         deleteTestNode(ctrlTest, testNode1);
         assert.isUndefined(ctrlTest.items.get(testUri1.path));
+    });
+
+    const testUri2 = vscode.Uri.file('/spec');
+    const testNode2 = ctrlTest.createTestItem(testUri2.path, 'spec', testUri2);
+    ctrlTest.items.add(testNode2);
+    testMap.set(testUri2.path, testNode2);
+    const testUri3 = vscode.Uri.file('/spec/test2.lua');
+    const testNode3 = ctrlTest.createTestItem(testUri3.path, 'test2.lua', testUri3);
+    testMap.set(testUri3.path, testNode3);
+    testNode2.children.add(testNode3);
+
+    test('removes children cases from test map', () => {
+        assert.isObject(findTestNode(testUri2));
+        assert.isObject(findTestNode(testUri3));
+        deleteTestNode(ctrlTest, testNode2);
+        assert.isUndefined(findTestNode(testUri2));
+        assert.isUndefined(findTestNode(testUri3));
     });
 
     ctrlTest.dispose();
