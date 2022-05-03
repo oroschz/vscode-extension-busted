@@ -37,7 +37,7 @@ async function watchWorkspace(
     const pattern = new vscode.RelativePattern(workspace, GLOB_PATTERN);
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-    watcher.onDidCreate(uri => appendTestFile(ctrlTest, uri));
+    watcher.onDidCreate(uri => appendTestFile(ctrlTest, workspace, uri));
 
     watcher.onDidDelete(uri => removeTestFile(ctrlTest, uri));
 
@@ -64,18 +64,19 @@ async function resolveWorkspace(
     const testFiles = found.filter(validTestFilename);
 
     for (const file of testFiles) {
-        appendTestFile(ctrlTest, file);
+        appendTestFile(ctrlTest, workspace, file);
     }
 }
 
 async function appendTestFile(
     ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
     const exists = findTestNode(uri);
     if (exists) { return; }
 
-    const test = createTestNode(ctrlTest, uri);
+    const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
     vscode.window.showInformationMessage(test.label);

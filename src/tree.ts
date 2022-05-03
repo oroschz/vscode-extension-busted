@@ -5,17 +5,13 @@ export const testMap = new Map<string, vscode.TestItem>();
 
 export function createTestNode(
     ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri,
 ) {
-    const workspace = vscode.workspace.getWorkspaceFolder(uri);
-    if (!workspace) { return; }
-
-    const relativePath = vscode.workspace.asRelativePath(uri.path, true);
-
-    if (relativePath.includes("/.")) { return; }
-
-    const tokens = relativePath.split("/");
     const root = path.dirname(workspace.uri.path);
+    const relativePath = path.relative(root, uri.path);
+    const tokens = relativePath.split("/");
+
     return createTestBranch(ctrlTest, root, tokens);
 }
 
