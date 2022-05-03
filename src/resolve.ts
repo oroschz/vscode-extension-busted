@@ -8,8 +8,9 @@ export function createTestResolver(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController
 ) {
-    resolveAllWorkspaces(ctrlTest);
-    watchAllWorkspaces(context, ctrlTest);
+    const workspaces = vscode.workspace.workspaceFolders ?? [];
+    resolveAllWorkspaces(ctrlTest, workspaces);
+    watchAllWorkspaces(context, ctrlTest, workspaces);
 
     return function () {
     };
@@ -17,9 +18,9 @@ export function createTestResolver(
 
 async function watchAllWorkspaces(
     context: vscode.ExtensionContext,
-    ctrlTest: vscode.TestController
+    ctrlTest: vscode.TestController,
+    workspaces: readonly vscode.WorkspaceFolder[]
 ) {
-    const workspaces = vscode.workspace.workspaceFolders ?? [];
     const watchers = await Promise.all(
         workspaces.map(
             workspace => watchWorkspace(ctrlTest, workspace)
@@ -47,9 +48,9 @@ async function watchWorkspace(
 }
 
 async function resolveAllWorkspaces(
-    ctrlTest: vscode.TestController
+    ctrlTest: vscode.TestController,
+    workspaces: readonly vscode.WorkspaceFolder[]
 ) {
-    const workspaces = vscode.workspace.workspaceFolders ?? [];
     workspaces.forEach(
         workspace => resolveWorkspace(ctrlTest, workspace)
     );
