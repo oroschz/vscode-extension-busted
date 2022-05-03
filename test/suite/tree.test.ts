@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { assert } from 'chai';
-import { findTestNode, createTestBranch, deleteTestNode, testMap } from '../../src/tree';
+import {
+    findTestNode,
+    createTestNode,
+    createTestBranch,
+    deleteTestNode,
+    testMap
+} from '../../src/tree';
 
 suite('findTestNode', () => {
     test('returns undefined when there are not tests', () => {
@@ -58,6 +64,28 @@ suite('deleteTestNode', () => {
         deleteTestNode(ctrlTest, testMap.get('/spec')!);
         assert.isUndefined(testMap.get('/spec'));
         assert.isUndefined(testMap.get('/spec/test2.lua'));
+    });
+
+    ctrlTest.dispose();
+});
+
+suite('createTestNode', () => {
+    const ctrlTest = vscode.tests.createTestController('busted', 'busted');
+
+    test('creates a test branch', () => {
+        const wsUri = vscode.Uri.file('/home/module');
+        const specUri = vscode.Uri.file('/home/module/spec');
+        const testUri = vscode.Uri.file('/home/module/spec/test.lua');
+
+        const workspace = {
+            uri: wsUri, name: 'module', index: 0
+        };
+
+        createTestNode(ctrlTest, workspace, testUri);
+
+        assert.isObject(findTestNode(wsUri));
+        assert.isObject(findTestNode(specUri));
+        assert.isObject(findTestNode(testUri));
     });
 
     ctrlTest.dispose();
