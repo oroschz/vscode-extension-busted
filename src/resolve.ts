@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { createTestNode, findTestNode, deleteTestNode } from './tree';
-import { validTestFilename } from './utils';
+import { isValidTestFile } from './utils';
 
-const GLOB_PATTERN = 'spec/**/*_spec.lua';
+const GLOB_PATTERN = 'spec/**';
 
 export function createTestResolver(
     context: vscode.ExtensionContext,
@@ -35,7 +35,7 @@ async function watchWorkspace(
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder
 ) {
-    const pattern = new vscode.RelativePattern(workspace, GLOB_PATTERN);
+    const pattern = new vscode.RelativePattern(workspace, 'spec/**');
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
     watcher.onDidCreate(uri => appendTestFile(ctrlTest, workspace, uri));
@@ -61,10 +61,9 @@ async function resolveWorkspace(
     workspace: vscode.WorkspaceFolder
 ) {
     const pattern = new vscode.RelativePattern(workspace, GLOB_PATTERN);
-    const found = await vscode.workspace.findFiles(pattern);
-    const testFiles = found.filter(validTestFilename);
+    const foundFiles = await vscode.workspace.findFiles(pattern);
 
-    for (const file of testFiles) {
+    for (const file of foundFiles) {
         appendTestFile(ctrlTest, workspace, file);
     }
 }
@@ -76,6 +75,8 @@ async function appendTestFile(
 ) {
     const exists = findTestNode(uri);
     if (exists) { return; }
+
+    if (!isValidTestFile(uri)) { return; }
 
     const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }

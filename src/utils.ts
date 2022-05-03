@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
 
-export function validTestFilename(
+export function isValidTestFile(
     uri: vscode.Uri
 ) {
-    const workspace = vscode.workspace.getWorkspaceFolder(uri);
-    if (!workspace) { return false; }
+    const isHidden = uri.path.includes('/.');
+    const hasSpecSuffix = uri.path.endsWith('_spec.lua');
 
-    const relativePath = vscode.workspace.asRelativePath(uri.path, true);
-    return !relativePath.includes('/.');
+    return !isHidden && hasSpecSuffix;
 }
