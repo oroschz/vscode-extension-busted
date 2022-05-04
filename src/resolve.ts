@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { createTestNode, findTestNode, deleteTestNode } from './tree';
+import { parseTestFile } from './populate';
 import { isValidTestFile } from './utils';
 
 const GLOB_PATTERN = 'spec/**';
@@ -9,10 +10,14 @@ export function createTestResolver(
     ctrlTest: vscode.TestController
 ) {
     const workspaces = vscode.workspace.workspaceFolders ?? [];
-    resolveAllWorkspaces(ctrlTest, workspaces);
     watchAllWorkspaces(context, ctrlTest, workspaces);
 
-    return function () {
+    return async function (test?: vscode.TestItem) {
+        if (!test) {
+            return resolveAllWorkspaces(ctrlTest, workspaces);
+        }
+        const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
+        return parseTestFile(ctrlTest, test, workspace);
     };
 }
 
@@ -81,7 +86,7 @@ async function appendTestFile(
     const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
-    vscode.window.showInformationMessage(test.label);
+    test.canResolveChildren = true;
 }
 
 async function removeTestFile(
