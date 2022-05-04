@@ -8,3 +8,13 @@ export function isValidTestFile(
 
     return !isHidden && hasSpecSuffix;
 }
+
+/** Generates the id of a test case given its uri and label */
+export function getTestCaseId(uri: vscode.Uri, label: string) {
+    return uri.path.trim() + ":" + label.trim();
+};
+
+export const getChildCase = (group: vscode.TestItem, label: string) => {
+    const caseId = getTestCaseId(group.uri!, label);
+    return group.children.get(caseId);
+};

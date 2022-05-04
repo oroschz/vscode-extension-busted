@@ -47,7 +47,7 @@ async function watchWorkspace(
 
     watcher.onDidDelete(uri => removeTestFile(ctrlTest, uri));
 
-    watcher.onDidChange(uri => updateTestFile(ctrlTest, uri));
+    watcher.onDidChange(uri => updateTestFile(ctrlTest, workspace, uri));
 
     return watcher;
 }
@@ -66,11 +66,11 @@ async function resolveWorkspace(
     workspace: vscode.WorkspaceFolder
 ) {
     const pattern = new vscode.RelativePattern(workspace, GLOB_PATTERN);
-    const foundFiles = await vscode.workspace.findFiles(pattern);
+    const files = await vscode.workspace.findFiles(pattern);
 
-    for (const file of foundFiles) {
-        appendTestFile(ctrlTest, workspace, file);
-    }
+    return Promise.allSettled(
+        files.map(file => appendTestFile(ctrlTest, workspace, file))
+    );
 }
 
 async function appendTestFile(
@@ -86,7 +86,7 @@ async function appendTestFile(
     const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
-    test.canResolveChildren = true;
+    parseTestFile(ctrlTest, test, workspace);
 }
 
 async function removeTestFile(
@@ -102,10 +102,14 @@ async function removeTestFile(
 
 async function updateTestFile(
     ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
     const test = findTestNode(uri);
     if (!test) { return; }
 
-    vscode.window.showWarningMessage(test.label);
+    test.children.forEach(
+        item => test.children.delete(item.id)
+    );
+    parseTestFile(ctrlTest, test, workspace);
 }

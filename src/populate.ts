@@ -1,11 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
-
-/** Generates the id of a test case given its uri and label */
-function getTestCaseId(uri: vscode.Uri, label: string) {
-    return uri.path.trim() + ":" + label.trim();
-};
+import { getTestCaseId } from './utils';
 
 /** Parses an output line to retrive their aproximate row and label. */
 function parseStdOut(line: string) {
