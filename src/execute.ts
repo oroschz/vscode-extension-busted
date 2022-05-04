@@ -72,7 +72,7 @@ function updateNodeResults(
         run.errored(group, new vscode.TestMessage(""), duration);
     } else if (results.pendings.length) {
         run.skipped(group);
-    } else {
+    } else if (results.successes.length) {
         run.passed(group, duration);
     }
 };
@@ -152,7 +152,7 @@ export async function createTestRunner(
         if (!test.uri) { return; }
 
         const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
-        return runTestNode(test, run, token);
+        return runTestNode(test, run, token, workspace);
     };
 
     // Run tests files sequencially
