@@ -1,15 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { tokenizePath } from './utils';
 
 export function createTestNode(
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri,
 ) {
-    const root = path.dirname(workspace.uri.path);
-    const relativePath = path.relative(root, uri.path);
-    const tokens = relativePath.split("/");
-
+    const { root, tokens } = tokenizePath(workspace, uri);
     return createTestBranch(ctrlTest, root, tokens);
 }
 
@@ -51,10 +49,7 @@ export function findTestNode(
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri,
 ) {
-    const root = path.dirname(workspace.uri.path);
-    const relativePath = path.relative(root, uri.path);
-    const tokens = relativePath.split("/");
-
+    const { root, tokens } = tokenizePath(workspace, uri);
     return findTestNodeRecursion(ctrlTest, root, tokens);
 }
 
