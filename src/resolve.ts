@@ -117,8 +117,6 @@ async function updateTestFile(
     const test = findTestNode(uri);
     if (!test) { return; }
 
-    test.children.forEach(
-        item => test.children.delete(item.id)
-    );
+    test.children.replace([]);
     parseTestFile(context, ctrlTest, workspace, test);
 }
