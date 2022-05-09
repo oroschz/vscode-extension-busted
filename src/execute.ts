@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import { getChildCase } from './utils';
 import { createBustedProcess } from './process';
 
-type TestCaseResult = {
+type TestStatus = 'success' | 'failure' | 'pending' | 'error';
+
+type TestResults = {
     name: string,
     element: {
         duration: number,
@@ -12,97 +14,94 @@ type TestCaseResult = {
     }
 };
 
-type TestRunResult = {
-    successes: TestCaseResult[],
-    failures: TestCaseResult[],
-    pendings: TestCaseResult[],
-    errors: TestCaseResult[],
+type SuiteResults = {
+    successes: TestResults[],
+    failures: TestResults[],
+    pendings: TestResults[],
+    errors: TestResults[],
     duration: number
 };
 
-function updateCaseResults(
-    results: TestRunResult,
+function updateTestResults(
+    result: TestResults,
+    status: TestStatus,
     run: vscode.TestRun,
-    group: vscode.TestItem
+    suite: vscode.TestItem
+) {
+    const test = getChildCase(suite, result.name);
+    if (!test) { return; }
+
+    const duration = 1000 * result.element.duration;
+    const message = result.trace.traceback;
+    const testMessage = new vscode.TestMessage(message);
+
+    switch (status) {
+        case 'success':
+            return run.passed(test, duration);
+        case 'pending':
+            return run.skipped(test);
+        case 'failure':
+            return run.failed(test, testMessage, duration);
+        case 'error':
+            return run.errored(test, testMessage, duration);
+    }
+}
+
+function updateAllResults(
+    results: SuiteResults,
+    run: vscode.TestRun,
+    suite: vscode.TestItem
 ) {
     for (const result of results.successes) {
-        const testCase = getChildCase(group, result.name);
-        if (!testCase) { continue; }
-
-        const duration = 1000 * result.element.duration;
-        run.passed(testCase, duration);
+        updateTestResults(result, 'success', run, suite);
     }
 
     for (const result of results.failures) {
-        const testCase = getChildCase(group, result.name);
-        if (!testCase) { continue; }
-
-        const message = new vscode.TestMessage(result.trace.traceback);
-        const duration = 1000 * result.element.duration;
-        run.failed(testCase, message, duration);
+        updateTestResults(result, 'failure', run, suite);
     }
 
     for (const result of results.pendings) {
-        const testCase = getChildCase(group, result.name);
-        if (!testCase) { continue; }
-
-        run.skipped(testCase);
+        updateTestResults(result, 'pending', run, suite);
     }
 
     for (const result of results.errors) {
-        const testCase = getChildCase(group, result.name);
-        if (!testCase) { continue; }
-
-        const message = new vscode.TestMessage(result.trace.traceback);
-        const duration = 1000 * result.element.duration;
-        run.errored(testCase, message, duration);
+        updateTestResults(result, 'error', run, suite);
     }
-};
+}
 
-function updateNodeResults(
-    results: TestRunResult,
+function updateSuiteResults(
+    results: SuiteResults,
     run: vscode.TestRun,
-    group: vscode.TestItem
+    suite: vscode.TestItem
 ) {
     const duration = 1000 * results.duration;
-    if (results.failures.length) {
-        run.failed(group, new vscode.TestMessage(""), duration);
-    } else if (results.errors.length) {
-        run.errored(group, new vscode.TestMessage(""), duration);
-    } else if (results.pendings.length) {
-        run.skipped(group);
-    } else if (results.successes.length) {
-        run.passed(group, duration);
+    const message = new vscode.TestMessage("");
+
+    if (results.errors.length > 0) {
+        return run.errored(suite, message, duration);
     }
+    if (results.failures.length > 0) {
+        return run.failed(suite, message, duration);
+    }
+    if (results.pendings.length > 0) {
+        return run.skipped(suite);
+    }
+    if (results.successes.length > 0) {
+        return run.passed(suite, duration);
+    }
+    run.skipped(suite);
 };
 
-function getTestQueue(
-    include: vscode.TestItem[],
-    run: vscode.TestRun
-): vscode.TestItem[] {
-
-    const queue = [];
-    for (const item of include) {
-        run.enqueued(item);
-        if (item.uri?.path.includes('.lua')) {
-            queue.push(item);
-            item.children.forEach(child => run.enqueued(child));
-            continue;
-        }
-        item.children.forEach(child => include.push(child));
-    }
-    return queue;
-};
-
-function runTestNode(
-    test: vscode.TestItem,
+function runTestSuite(
+    context: vscode.ExtensionContext,
+    workspace: vscode.WorkspaceFolder,
     run: vscode.TestRun,
     token: vscode.CancellationToken,
-    workspace: vscode.WorkspaceFolder
+    suite: vscode.TestItem,
 ) {
     return new Promise<void>((resolve) => {
 
-        const child = createBustedProcess('json', workspace, test.uri!);
+        const child = createBustedProcess('json', workspace, suite.uri!);
 
         token.onCancellationRequested(() => child.kill());
 
@@ -112,19 +111,47 @@ function runTestNode(
         child.on('close', (code) => {
             if (child.killed) { return resolve(); }
             try {
-                const results = JSON.parse(output) as TestRunResult;
-                updateCaseResults(results, run, test);
-                updateNodeResults(results, run, test);
+                const results = JSON.parse(output) as SuiteResults;
+                updateAllResults(results, run, suite);
+                updateSuiteResults(results, run, suite);
             } catch {
                 const message = "Error parsing json input.";
-                run.errored(test, new vscode.TestMessage(message));
+                run.errored(suite, new vscode.TestMessage(message));
             }
             resolve();
         });
 
-        run.started(test);
+        run.started(suite);
     });
-};
+}
+
+function createQueueRecurse(
+    run: vscode.TestRun,
+    queue: vscode.TestItem[],
+    item: vscode.TestItem
+) {
+    if (item.uri?.path.endsWith('.lua')) {
+        run.enqueued(item);
+        queue.push(item);
+        return;
+    }
+    item.children.forEach(
+        child => createQueueRecurse(run, queue, child)
+    );
+}
+
+function createQueue(
+    ctrlTest: vscode.TestController,
+    run: vscode.TestRun,
+    request: vscode.TestRunRequest,
+) {
+    const exclude = request.exclude ?? [];
+    const candidates = request.include ?? ctrlTest.items;
+    const queue = [] as vscode.TestItem[];
+
+    candidates.forEach(item => createQueueRecurse(run, queue, item));
+    return queue.filter(item => !exclude.includes(item));
+}
 
 async function testRunner(
     context: vscode.ExtensionContext,
@@ -133,31 +160,18 @@ async function testRunner(
     token: vscode.CancellationToken
 ) {
     const run = ctrlTest.createTestRun(request);
-    const include: vscode.TestItem[] = [];
+    const queue = createQueue(ctrlTest, run, request);
 
-    if (request.include) {
-        request.include.forEach((test) => include.push(test));
-    } else {
-        ctrlTest.items.forEach((test) => include.push(test));
-    }
-
-    const queue = getTestQueue(include, run);
-
-    const runTestFile = async (test: vscode.TestItem) => {
-
-        if (request.exclude?.includes(test)) { return; }
-        if (token.isCancellationRequested) { return; }
-        if (!test.uri) { return; }
-
-        const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
-        return runTestNode(test, run, token, workspace!);
+    const runTestFile = (suite: vscode.TestItem) => {
+        const workspace = vscode.workspace.getWorkspaceFolder(suite.uri!);
+        return runTestSuite(context, workspace!, run, token, suite);
     };
 
-    // Run tests files sequencially
-    // for (const test of queue) { await runTestFile(test); }
+    // Run suites sequentially
+    for (const test of queue) { await runTestFile(test); }
 
-    // Run tests files concurrently
-    await Promise.allSettled(queue.map(runTestFile));
+    // Run suites concurrently
+    // await Promise.allSettled(queue.map(runTestFile));
 
     run.end();
 }
@@ -169,4 +183,4 @@ export function createTestRunner(
     return (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
         return testRunner(context, ctrlTest, request, token);
     };
-};
+}
