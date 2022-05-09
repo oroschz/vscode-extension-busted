@@ -129,18 +129,19 @@ function runTestNode(
     });
 };
 
-export async function createTestRunner(
-    ctrl: vscode.TestController,
+async function testRunner(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken
 ) {
-    const run = ctrl.createTestRun(request);
+    const run = ctrlTest.createTestRun(request);
     const include: vscode.TestItem[] = [];
 
     if (request.include) {
         request.include.forEach((test) => include.push(test));
     } else {
-        ctrl.items.forEach((test) => include.push(test));
+        ctrlTest.items.forEach((test) => include.push(test));
     }
 
     const queue = getTestQueue(include, run);
@@ -162,4 +163,13 @@ export async function createTestRunner(
     await Promise.allSettled(queue.map(runTestFile));
 
     run.end();
+}
+
+export function createTestRunner(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController
+) {
+    return (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
+        return testRunner(context, ctrlTest, request, token);
+    };
 };

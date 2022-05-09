@@ -9,13 +9,11 @@ export function activate(context: vscode.ExtensionContext) {
 
     ctrlTest.resolveHandler = createTestResolver(context, ctrlTest);
 
-    const testRunner = (
-        request: vscode.TestRunRequest,
-        token: vscode.CancellationToken) => createTestRunner(ctrlTest, request, token);
-
+    const runnerTest = createTestRunner(context, ctrlTest);
+    
     context.subscriptions.push(
-        ctrlTest.createRunProfile('Run', vscode.TestRunProfileKind.Run, testRunner),
-        ctrlTest.createRunProfile('Debug', vscode.TestRunProfileKind.Debug, testRunner)
+        ctrlTest.createRunProfile('Run', vscode.TestRunProfileKind.Run, runnerTest),
+        ctrlTest.createRunProfile('Debug', vscode.TestRunProfileKind.Debug, runnerTest)
     );
 }
 
