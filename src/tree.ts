@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-export const testMap = new Map<string, vscode.TestItem>();
-
 export function createTestNode(
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder,
@@ -43,15 +41,36 @@ function getOrCreateTest(
     const testUri = vscode.Uri.file(id);
     const testItem = ctrlTest.createTestItem(id, name, testUri);
 
-    testMap.set(id, testItem);
     collection.add(testItem);
 
     return testItem;
 }
 
-export function findTestNode(uri: vscode.Uri) {
+export function findTestNode(
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    uri: vscode.Uri,
+) {
+    const root = path.dirname(workspace.uri.path);
+    const relativePath = path.relative(root, uri.path);
+    const tokens = relativePath.split("/");
 
-    return testMap.get(uri.path);
+    return findTestNodeRecursion(ctrlTest, root, tokens);
+}
+
+function findTestNodeRecursion(
+    ctrlTest: vscode.TestController,
+    root: string,
+    tokens: string[],
+    parent?: vscode.TestItem,
+): vscode.TestItem | undefined {
+
+    const testId = path.join(parent?.uri?.path ?? root, tokens[0]);
+    const collection = parent?.children ?? ctrlTest.items;
+    const testItem = collection.get(testId);
+
+    if (tokens.length <= 1) { return testItem; }
+    return findTestNodeRecursion(ctrlTest, root, tokens.slice(1), testItem);
 }
 
 export function deleteTestNode(
@@ -61,12 +80,4 @@ export function deleteTestNode(
     const collection = test.parent?.children ?? ctrlTest.items;
 
     collection.delete(test.id);
-    removeFromTestMap(test);
-}
-
-function removeFromTestMap(
-    test: vscode.TestItem
-) {
-    testMap.delete(test.id);
-    test.children.forEach(child => removeFromTestMap(child));
 }

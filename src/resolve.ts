@@ -84,7 +84,7 @@ async function appendTestFile(
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
-    const exists = findTestNode(uri);
+    const exists = findTestNode(ctrlTest, workspace, uri);
     if (exists) { return; }
 
     if (!isValidTestFile(uri)) { return; }
@@ -101,7 +101,7 @@ async function removeTestFile(
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
-    const test = findTestNode(uri);
+    const test = findTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
     deleteTestNode(ctrlTest, test);
@@ -114,7 +114,7 @@ async function updateTestFile(
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
-    const test = findTestNode(uri);
+    const test = findTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
     test.children.replace([]);

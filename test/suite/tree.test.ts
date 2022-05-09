@@ -4,15 +4,21 @@ import {
     findTestNode,
     createTestNode,
     createTestBranch,
-    deleteTestNode,
-    testMap
+    deleteTestNode
 } from '../../src/tree';
 
+
 suite('findTestNode', () => {
+    const ctrlTest = vscode.tests.createTestController('busted', 'busted');
+
     test('returns undefined when there are not tests', () => {
-        const result = findTestNode(vscode.Uri.file('/'));
+        const workspace = { index: -1, name: "", uri: vscode.Uri.file('/') };
+        const file = vscode.Uri.file('/test');
+        const result = findTestNode(ctrlTest, workspace, file);
         assert.isUndefined(result);
     });
+
+    ctrlTest.dispose();
 });
 
 suite('createTestBranch', () => {
@@ -29,10 +35,11 @@ suite('createTestBranch', () => {
     });
 
     test('adds test cases to the test map', () => {
-        assert.isUndefined(testMap.get('/root'));
-        assert.isObject(testMap.get('/test1.lua'));
-        assert.isObject(testMap.get('/subspec'));
-        assert.isObject(testMap.get('/subspec/test2.lua'));
+        const workspace = { index: -1, name: '', uri: vscode.Uri.file('/') };
+        assert.isUndefined(findTestNode(ctrlTest, workspace, vscode.Uri.file('/root')));
+        assert.isObject(findTestNode(ctrlTest, workspace, vscode.Uri.file('/test1.lua')));
+        assert.isObject(findTestNode(ctrlTest, workspace, vscode.Uri.file('/subspec')));
+        assert.isObject(findTestNode(ctrlTest, workspace, vscode.Uri.file('/subspec/test2.lua')));
     });
 
     test('adds test cases to test tree', () => {
@@ -48,22 +55,17 @@ suite('createTestBranch', () => {
 suite('deleteTestNode', () => {
     const ctrlTest = vscode.tests.createTestController('busted', 'busted');
 
-    createTestBranch(ctrlTest, '/', ['test1.lua']);
-
-    test('removed test case from test tree', () => {
-        assert.isObject(ctrlTest.items.get('/test1.lua'));
-        deleteTestNode(ctrlTest, testMap.get('/test1.lua')!);
-        assert.isUndefined(ctrlTest.items.get('/test1.lua'));
-    });
-
     createTestBranch(ctrlTest, '/', ['spec', 'test2.lua']);
 
-    test('removes children cases from test map', () => {
-        assert.isObject(testMap.get('/spec'));
-        assert.isObject(testMap.get('/spec/test2.lua'));
-        deleteTestNode(ctrlTest, testMap.get('/spec')!);
-        assert.isUndefined(testMap.get('/spec'));
-        assert.isUndefined(testMap.get('/spec/test2.lua'));
+    test('removes children cases from test tree', () => {
+        const workspace = { index: -1, name: '', uri: vscode.Uri.file('/') };
+        assert.isObject(findTestNode(ctrlTest, workspace, vscode.Uri.file('/spec')));
+        assert.isObject(findTestNode(ctrlTest, workspace, vscode.Uri.file('/spec/test2.lua')));
+
+        deleteTestNode(ctrlTest, findTestNode(ctrlTest, workspace, vscode.Uri.file('/spec'))!);
+
+        assert.isUndefined(findTestNode(ctrlTest, workspace, vscode.Uri.file('/spec')));
+        assert.isUndefined(findTestNode(ctrlTest, workspace, vscode.Uri.file('/spec/test2.lua')));
     });
 
     ctrlTest.dispose();
@@ -83,9 +85,9 @@ suite('createTestNode', () => {
 
         createTestNode(ctrlTest, workspace, testUri);
 
-        assert.isObject(findTestNode(wsUri));
-        assert.isObject(findTestNode(specUri));
-        assert.isObject(findTestNode(testUri));
+        assert.isObject(findTestNode(ctrlTest, workspace, wsUri));
+        assert.isObject(findTestNode(ctrlTest, workspace, specUri));
+        assert.isObject(findTestNode(ctrlTest, workspace, testUri));
     });
 
     ctrlTest.dispose();
