@@ -41,9 +41,10 @@ function getTestCase(
 
 /** Executes 'busted --list' to discover test cases. */
 export async function parseTestFile(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
     test: vscode.TestItem,
-    workspace?: vscode.WorkspaceFolder
 ) {
 
     const args = ['--list', test.uri!.path];

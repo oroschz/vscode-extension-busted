@@ -14,10 +14,12 @@ export function createTestResolver(
 
     return async function (test?: vscode.TestItem) {
         if (!test) {
-            return resolveAllWorkspaces(ctrlTest, workspaces);
+            return resolveAllWorkspaces(context, ctrlTest, workspaces);
         }
         const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
-        return parseTestFile(ctrlTest, test, workspace);
+        if (workspace) {
+            return parseTestFile(context, ctrlTest, workspace, test);
+        }
     };
 }
 
@@ -28,7 +30,7 @@ async function watchAllWorkspaces(
 ) {
     const watchers = await Promise.all(
         workspaces.map(
-            workspace => watchWorkspace(ctrlTest, workspace)
+            workspace => watchWorkspace(context, ctrlTest, workspace)
         )
     );
     watchers.forEach(
@@ -37,31 +39,34 @@ async function watchAllWorkspaces(
 }
 
 async function watchWorkspace(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder
 ) {
     const pattern = new vscode.RelativePattern(workspace, 'spec/**');
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-    watcher.onDidCreate(uri => appendTestFile(ctrlTest, workspace, uri));
+    watcher.onDidCreate(uri => appendTestFile(context, ctrlTest, workspace, uri));
 
-    watcher.onDidDelete(uri => removeTestFile(ctrlTest, uri));
+    watcher.onDidDelete(uri => removeTestFile(context, ctrlTest, workspace, uri));
 
-    watcher.onDidChange(uri => updateTestFile(ctrlTest, workspace, uri));
+    watcher.onDidChange(uri => updateTestFile(context, ctrlTest, workspace, uri));
 
     return watcher;
 }
 
 async function resolveAllWorkspaces(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
     workspaces: readonly vscode.WorkspaceFolder[]
 ) {
     workspaces.forEach(
-        workspace => resolveWorkspace(ctrlTest, workspace)
+        workspace => resolveWorkspace(context, ctrlTest, workspace)
     );
 }
 
 async function resolveWorkspace(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder
 ) {
@@ -69,11 +74,12 @@ async function resolveWorkspace(
     const files = await vscode.workspace.findFiles(pattern);
 
     return Promise.allSettled(
-        files.map(file => appendTestFile(ctrlTest, workspace, file))
+        files.map(file => appendTestFile(context, ctrlTest, workspace, file))
     );
 }
 
 async function appendTestFile(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
@@ -86,11 +92,13 @@ async function appendTestFile(
     const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }
 
-    parseTestFile(ctrlTest, test, workspace);
+    parseTestFile(context, ctrlTest, workspace, test);
 }
 
 async function removeTestFile(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
 ) {
     const test = findTestNode(uri);
@@ -101,6 +109,7 @@ async function removeTestFile(
 }
 
 async function updateTestFile(
+    context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
     workspace: vscode.WorkspaceFolder,
     uri: vscode.Uri
@@ -111,5 +120,5 @@ async function updateTestFile(
     test.children.forEach(
         item => test.children.delete(item.id)
     );
-    parseTestFile(ctrlTest, test, workspace);
+    parseTestFile(context, ctrlTest, workspace, test);
 }
