@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
 import { getChildCase } from './utils';
-
+import { createBustedProcess } from './process';
 
 type TestCaseResult = {
     name: string,
@@ -99,13 +98,11 @@ function runTestNode(
     test: vscode.TestItem,
     run: vscode.TestRun,
     token: vscode.CancellationToken,
-    workspace?: vscode.WorkspaceFolder
+    workspace: vscode.WorkspaceFolder
 ) {
     return new Promise<void>((resolve) => {
 
-        const args = ['-o', 'json', test.uri!.path];
-        const options = workspace ? { cwd: workspace.uri.path } : {};
-        const child = spawn('busted', args, options);
+        const child = createBustedProcess('json', workspace, test.uri!);
 
         token.onCancellationRequested(() => child.kill());
 
@@ -153,7 +150,7 @@ async function testRunner(
         if (!test.uri) { return; }
 
         const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
-        return runTestNode(test, run, token, workspace);
+        return runTestNode(test, run, token, workspace!);
     };
 
     // Run tests files sequencially

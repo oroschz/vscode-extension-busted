@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
+import { createBustedProcess } from './process';
 import { createInterface } from 'readline';
 import { getTestCaseId } from './utils';
 
@@ -46,10 +46,7 @@ export async function parseTestFile(
     workspace: vscode.WorkspaceFolder,
     test: vscode.TestItem,
 ) {
-
-    const args = ['--list', test.uri!.path];
-    const options = workspace ? { 'cwd': workspace.uri.path } : {};
-    const child = spawn('busted', args, options);
+    const child = createBustedProcess('list', workspace, test.uri!);
 
     test.canResolveChildren = false;
 
