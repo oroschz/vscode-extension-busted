@@ -171,12 +171,15 @@ async function testRunner(
         return runTestSuite(context, workspace!, run, token, suite);
     };
 
-    // Run suites sequentially
-    for (const test of queue) { await runTestFile(test); }
-
-    // Run suites concurrently
-    // await Promise.allSettled(queue.map(runTestFile));
-
+    const execution = context.globalState.get('execution', 'sequential');
+    if (execution === 'sequential') {
+        for (const test of queue) {
+            await runTestFile(test);
+        }
+    } else {
+        await Promise.allSettled(queue.map(runTestFile));
+    }
+    
     run.end();
 }
 

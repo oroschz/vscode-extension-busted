@@ -3,18 +3,17 @@ import { createTestNode, findTestNode, deleteTestNode } from './tree';
 import { parseTestFile } from './populate';
 import { isValidTestFile } from './utils';
 
-const GLOB_PATTERN = 'spec/**';
-
 export function createTestResolver(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController
 ) {
+    const specPrefix = context.globalState.get('prefix', 'spec/**');
     const workspaces = vscode.workspace.workspaceFolders ?? [];
-    watchAllWorkspaces(context, ctrlTest, workspaces);
+    watchAllWorkspaces(context, ctrlTest, workspaces, specPrefix);
 
-    return async function (test?: vscode.TestItem) {
+    return async (test?: vscode.TestItem) => {
         if (!test) {
-            return resolveAllWorkspaces(context, ctrlTest, workspaces);
+            return resolveAllWorkspaces(context, ctrlTest, workspaces, specPrefix);
         }
         const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
         if (workspace) {
@@ -26,11 +25,12 @@ export function createTestResolver(
 async function watchAllWorkspaces(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
-    workspaces: readonly vscode.WorkspaceFolder[]
+    workspaces: readonly vscode.WorkspaceFolder[],
+    prefixPattern: string
 ) {
     const watchers = await Promise.all(
         workspaces.map(
-            workspace => watchWorkspace(context, ctrlTest, workspace)
+            workspace => watchWorkspace(context, ctrlTest, workspace, prefixPattern)
         )
     );
     watchers.forEach(
@@ -41,9 +41,10 @@ async function watchAllWorkspaces(
 async function watchWorkspace(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
-    workspace: vscode.WorkspaceFolder
+    workspace: vscode.WorkspaceFolder,
+    prefixPattern: string
 ) {
-    const pattern = new vscode.RelativePattern(workspace, 'spec/**');
+    const pattern = new vscode.RelativePattern(workspace, prefixPattern);
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
     watcher.onDidCreate(uri => appendTestFile(context, ctrlTest, workspace, uri));
@@ -58,19 +59,21 @@ async function watchWorkspace(
 async function resolveAllWorkspaces(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
-    workspaces: readonly vscode.WorkspaceFolder[]
+    workspaces: readonly vscode.WorkspaceFolder[],
+    prefixPattern: string
 ) {
     workspaces.forEach(
-        workspace => resolveWorkspace(context, ctrlTest, workspace)
+        workspace => resolveWorkspace(context, ctrlTest, workspace, prefixPattern)
     );
 }
 
 async function resolveWorkspace(
     context: vscode.ExtensionContext,
     ctrlTest: vscode.TestController,
-    workspace: vscode.WorkspaceFolder
+    workspace: vscode.WorkspaceFolder,
+    prefixPattern: string
 ) {
-    const pattern = new vscode.RelativePattern(workspace, GLOB_PATTERN);
+    const pattern = new vscode.RelativePattern(workspace, prefixPattern);
     const files = await vscode.workspace.findFiles(pattern);
 
     return Promise.allSettled(
@@ -87,7 +90,7 @@ async function appendTestFile(
     const exists = findTestNode(ctrlTest, workspace, uri);
     if (exists) { return; }
 
-    if (!isValidTestFile(uri)) { return; }
+    if (!isValidTestFile(context, uri)) { return; }
 
     const test = createTestNode(ctrlTest, workspace, uri);
     if (!test) { return; }

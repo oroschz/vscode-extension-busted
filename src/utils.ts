@@ -2,10 +2,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 export function isValidTestFile(
+    context: vscode.ExtensionContext,
     uri: vscode.Uri
 ) {
+    const suffix = context.globalState.get('suffix', '_spec.lua');
     const isHidden = uri.path.includes('/.');
-    const hasSpecSuffix = uri.path.endsWith('_spec.lua');
+    const hasSpecSuffix = uri.path.endsWith(suffix);
 
     return !isHidden && hasSpecSuffix;
 }
