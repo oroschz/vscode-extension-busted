@@ -105,7 +105,7 @@ function runTestSuite(
 ) {
     return new Promise<void>((resolve) => {
 
-        const child = createBustedProcess('json', workspace, suite.uri!);
+        const child = createBustedProcess(context, workspace, 'json', suite.uri!);
 
         token.onCancellationRequested(() => child.kill());
 
@@ -179,7 +179,7 @@ async function testRunner(
     } else {
         await Promise.allSettled(queue.map(runTestFile));
     }
-    
+
     run.end();
 }
 

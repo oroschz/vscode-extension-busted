@@ -6,6 +6,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     await context.globalState.update('prefix', 'spec/**');
     await context.globalState.update('suffix', '_spec.lua');
+    await context.globalState.update('program', 'busted');
     await context.globalState.update('execution', 'concurrent');
 
     const ctrlTest = vscode.tests.createTestController('busted-tests', 'Busted Tests');

@@ -46,7 +46,7 @@ export async function parseTestFile(
     workspace: vscode.WorkspaceFolder,
     test: vscode.TestItem,
 ) {
-    const child = createBustedProcess('list', workspace, test.uri!);
+    const child = createBustedProcess(context, workspace, 'list', test.uri!);
 
     test.canResolveChildren = false;
 

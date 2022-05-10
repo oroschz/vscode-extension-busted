@@ -11,12 +11,14 @@ function executionArguments(mode: ExecutionMode) {
 }
 
 export function createBustedProcess(
-    mode: ExecutionMode,
+    context: vscode.ExtensionContext,
     workspace: vscode.WorkspaceFolder,
-    uri: vscode.Uri,
+    mode: ExecutionMode,
+    uri: vscode.Uri
 ) {
+    const program = context.globalState.get('program', 'busted');
     const args = [uri.path, ...executionArguments(mode)];
     const options = { 'cwd': workspace.uri.path };
-    const child = spawn('busted', args, options);
-    return child;
+
+    return spawn(program, args, options);
 }
