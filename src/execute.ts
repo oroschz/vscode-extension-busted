@@ -6,6 +6,7 @@ type TestStatus = 'success' | 'failure' | 'pending' | 'error';
 
 type TestResults = {
     name: string,
+    message: string,
     element: {
         duration: number,
     }
@@ -32,18 +33,21 @@ function updateTestResults(
     if (!test) { return; }
 
     const duration = 1000 * result.element.duration;
-    const message = result.trace.traceback;
-    const testMessage = new vscode.TestMessage(message);
+    const message = new vscode.TestMessage(result.message);
 
     switch (status) {
         case 'success':
-            return run.passed(test, duration);
+            run.passed(test, duration);
+            break;
         case 'pending':
-            return run.skipped(test);
+            run.skipped(test);
+            break;
         case 'failure':
-            return run.failed(test, testMessage, duration);
+            run.failed(test, message, duration);
+            break;
         case 'error':
-            return run.errored(test, testMessage, duration);
+            run.errored(test, message, duration);
+            break;
     }
 }
 
