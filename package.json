@@ -25,26 +25,58 @@
 	],
 	"preview": true,
 	"main": "./dist/src/extension.js",
-	"contributes": {},
+	"contributes": {
+		"configuration": {
+			"title": "Busted Tests",
+			"properties": {
+				"busted-tests.pattern.prefix": {
+					"type": "string",
+					"default": "spec/**",
+					"description": "Prefix pattern usted to indicate your test folder."
+				},
+				"busted-tests.pattern.suffix": {
+					"type": "string",
+					"default": "_spec.lua",
+					"description": "Suffix pattern usted to identify your test files."
+				},
+				"busted-tests.execution.program": {
+					"type": "string",
+					"default": "busted",
+					"description": "Command to be executed on your shell to run busted."
+				},
+				"busted-tests.execution.mode": {
+					"type": "string",
+					"default": "concurrent",
+					"enum": [
+						"sequential",
+						"concurrent"
+					],
+					"description": "Execution mode in which to run your tests."
+				}
+			}
+		}
+	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
-		"test": "node ./dist/tests/runTest.js"
+		"test": "node ./dist/test/runTest.js"
 	},
 	"devDependencies": {
-		"@types/vscode": "^1.66.0",
+		"@types/chai": "^4.3.1",
 		"@types/glob": "^7.2.0",
 		"@types/mocha": "^9.1.0",
 		"@types/node": "14.x",
+		"@types/vscode": "^1.66.0",
 		"@typescript-eslint/eslint-plugin": "^5.16.0",
 		"@typescript-eslint/parser": "^5.16.0",
+		"@vscode/test-electron": "^2.1.3",
+		"chai": "^4.3.6",
 		"eslint": "^8.11.0",
 		"glob": "^7.2.0",
 		"mocha": "^9.2.2",
-		"typescript": "^4.5.5",
-		"@vscode/test-electron": "^2.1.3"
+		"typescript": "^4.5.5"
 	}
 }

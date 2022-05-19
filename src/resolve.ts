@@ -1,132 +1,125 @@
-import * as path from 'path';
 import * as vscode from 'vscode';
-import { getTestCaseId } from './util';
-import { TestController, Uri, WorkspaceFolder, TestItem, ExtensionContext } from 'vscode';
-import { spawn } from 'child_process';
+import { createTestNode, findTestNode, deleteTestNode } from './tree';
+import { parseTestFile } from './populate';
+import { isValidTestFile } from './utils';
 
+export function createTestResolver(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController
+) {
+    const specPrefix = context.globalState.get('prefix', 'spec/**');
+    const workspaces = vscode.workspace.workspaceFolders ?? [];
+    watchAllWorkspaces(context, ctrlTest, workspaces, specPrefix);
 
-export const getTestNode = (testCtrl: TestController, uri: Uri, create: boolean = true) => {
-
-    const workspace = vscode.workspace.getWorkspaceFolder(uri);
-    if (!workspace) { return; }
-
-    const relativePath = vscode.workspace.asRelativePath(uri.path, true);
-
-    // Exclude hidden tests.
-    if (relativePath.includes("/.")) { return; }
-
-    // Create a branch of testItems if necessary.
-    let testNode: vscode.TestItem | undefined;
-    let nodeGroup = testCtrl.items;
-    let nodeId = path.dirname(workspace.uri.path);
-    const tokens = relativePath.split("/");
-    for (const token of tokens) {
-        nodeId = path.join(nodeId, token);
-        testNode = nodeGroup.get(nodeId);
-        if (!testNode) {
-            if (!create) { return; }
-            testNode = testCtrl.createTestItem(nodeId, token, Uri.file(nodeId));
-            nodeGroup.add(testNode);
-        }
-        nodeGroup = testNode.children;
-    }
-    return testNode;
-};
-
-export const dropTestNode = (ctrl: TestController, uri: Uri) => {
-    const testNode = getTestNode(ctrl, uri, false);
-    if (!testNode) { return; }
-    if (!testNode.parent) {
-        ctrl.items.delete(uri.path);
-        return;
-    }
-    testNode.parent.children.delete(uri.path);
-};
-
-const watchWorkspace = async (ctrl: TestController, workspace: WorkspaceFolder) => {
-
-    const pattern = new vscode.RelativePattern(workspace, '**/*_spec.lua');
-    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-    watcher.onDidCreate(uri => parseTestNode(ctrl, getTestNode(ctrl, uri)));
-
-    watcher.onDidDelete(uri => dropTestNode(ctrl, uri));
-
-    watcher.onDidChange(uri => parseTestNode(ctrl, getTestNode(ctrl, uri)));
-
-    for (const file of await vscode.workspace.findFiles(pattern)) {
-        parseTestNode(ctrl, getTestNode(ctrl, file));
-    }
-
-    return watcher;
-};
-
-const watchAllWorkspaces = async (ctrl: TestController) => {
-
-    const workspaces = vscode.workspace.workspaceFolders;
-    if (!workspaces) { return []; }
-
-    return Promise.all(workspaces.map(ws => watchWorkspace(ctrl, ws)));
-};
-
-
-// Whether to resolve all workspaces, or just a particular node.
-export const resolver = (context: ExtensionContext, ctrl: TestController) => {
-    return async (test: TestItem | undefined) => {
+    return async (test?: vscode.TestItem) => {
         if (!test) {
-            const watchers = await watchAllWorkspaces(ctrl);
-            watchers.forEach(watcher => context.subscriptions.push(watcher));
-        } else {
-            await parseTestNode(ctrl, test);
+            return resolveAllWorkspaces(context, ctrlTest, workspaces, specPrefix);
+        }
+        const workspace = vscode.workspace.getWorkspaceFolder(test.uri!);
+        if (workspace) {
+            return parseTestFile(context, ctrlTest, workspace, test);
         }
     };
-};
+}
 
-// Parses an output line to retrive their aproximate row and label.
-const parseMatch = (text: string): [number, string] => {
+async function watchAllWorkspaces(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspaces: readonly vscode.WorkspaceFolder[],
+    prefixPattern: string
+) {
+    const watchers = await Promise.all(
+        workspaces.map(
+            workspace => watchWorkspace(context, ctrlTest, workspace, prefixPattern)
+        )
+    );
+    watchers.forEach(
+        watcher => context.subscriptions.push(watcher)
+    );
+}
 
-    const pattern = /([^\/]+(\/[^\/:]+)+_spec.lua):(\d+): (.+)/;
-    const match = pattern.exec(text);
+async function watchWorkspace(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    prefixPattern: string
+) {
+    const pattern = new vscode.RelativePattern(workspace, prefixPattern);
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-    if (!match) { return [1, text]; }
+    watcher.onDidCreate(uri => appendTestFile(context, ctrlTest, workspace, uri));
 
-    const row = parseInt(match[3]);
-    const name = match[4].trim();
+    watcher.onDidDelete(uri => removeTestFile(context, ctrlTest, workspace, uri));
 
-    return [row, name];
-};
+    watcher.onDidChange(uri => updateTestFile(context, ctrlTest, workspace, uri));
 
-// Generate test cases given an output line from the list command.
-export const getTestCase = (ctrl: TestController, text: string, test: TestItem) => {
+    return watcher;
+}
 
-    const [row, label] = parseMatch(text);
-    const testId = getTestCaseId(test.uri!, label);
+async function resolveAllWorkspaces(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspaces: readonly vscode.WorkspaceFolder[],
+    prefixPattern: string
+) {
+    workspaces.forEach(
+        workspace => resolveWorkspace(context, ctrlTest, workspace, prefixPattern)
+    );
+}
 
-    const existing = test.children.get(testId);
-    if (existing) { return; }
+async function resolveWorkspace(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    prefixPattern: string
+) {
+    const pattern = new vscode.RelativePattern(workspace, prefixPattern);
+    const files = await vscode.workspace.findFiles(pattern);
 
-    const testCase = ctrl.createTestItem(testId, label, test.uri);
-    test.children.add(testCase);
+    return Promise.allSettled(
+        files.map(file => appendTestFile(context, ctrlTest, workspace, file))
+    );
+}
 
-    const position = new vscode.Position(row - 1, 0);
-    testCase.range = new vscode.Range(position, position);
+async function appendTestFile(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    uri: vscode.Uri
+) {
+    const exists = findTestNode(ctrlTest, workspace, uri);
+    if (exists) { return; }
 
-    return testCase;
-};
+    if (!isValidTestFile(context, uri)) { return; }
 
-// Executes 'busted --list <spec file>' to discover test cases.
-export const parseTestNode = async (ctrl: TestController, test: TestItem | undefined) => {
+    const test = createTestNode(ctrlTest, workspace, uri);
+    if (!test) { return; }
 
-    if (!test?.uri) { return; }
+    parseTestFile(context, ctrlTest, workspace, test);
+}
 
-    const workspace = vscode.workspace.getWorkspaceFolder(test.uri);
-    if (!workspace) { return; }
+async function removeTestFile(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    uri: vscode.Uri
+) {
+    const test = findTestNode(ctrlTest, workspace, uri);
+    if (!test) { return; }
 
-    const options = { 'cwd': workspace.uri.path };
-    const child = spawn('busted', ['--list', test.uri.path], options);
+    deleteTestNode(ctrlTest, test);
+    vscode.window.showErrorMessage(test.label);
+}
 
-    child.stdout.on('data', data => {
-        const text = String.fromCharCode(...data).trim();
-        text.split('\n').forEach(line => getTestCase(ctrl, line, test));
-    });
-};
+async function updateTestFile(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    workspace: vscode.WorkspaceFolder,
+    uri: vscode.Uri
+) {
+    const test = findTestNode(ctrlTest, workspace, uri);
+    if (!test) { return; }
+
+    test.children.replace([]);
+    parseTestFile(context, ctrlTest, workspace, test);
+}

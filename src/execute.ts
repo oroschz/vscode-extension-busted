@@ -1,134 +1,193 @@
 import * as vscode from 'vscode';
-import { getTestCaseId } from './util';
-import { TestController, TestRun, TestRunRequest, CancellationToken, TestItem, TestMessage } from 'vscode';
-import { spawn } from 'child_process';
+import { getChildCase } from './utils';
+import { createBustedProcess } from './process';
 
-// Updates the tests run results based on busted json response.
-const updateRunResults = (results: any, run: TestRun, group: TestItem) => {
+type TestStatus = 'success' | 'failure' | 'pending' | 'error';
 
-    const { successes, failures, pendings, errors } = results;
-
-    const states = [successes, failures, pendings, errors];
-
-    for (const state of states) {
-        for (const result of state) {
-
-            const caseId = getTestCaseId(group.uri!, result.name);
-            const testCase = group.children.get(caseId);
-
-            if (!testCase) { continue; }
-
-            const duration = 1000 * result.element.duration;
-            const message = new TestMessage(result.trace.traceback);
-            switch (state) {
-                case successes:
-                    run.passed(testCase, duration);
-                    break;
-                case failures:
-                    run.failed(testCase, message, duration);
-                    break;
-                case pendings:
-                    run.skipped(testCase);
-                    break;
-                case errors:
-                    run.errored(testCase, message, duration);
-                    break;
-            }
-        }
+type TestResults = {
+    name: string,
+    message: string,
+    element: {
+        duration: number,
     }
-
-    const duration = 1000 * results.duration;
-    if (failures.length > 0) {
-        const message = new TestMessage("");
-        run.failed(group, message, duration);
-    } else if (errors.length > 0) {
-        const message = new TestMessage("");
-        run.errored(group, message, duration);
-    } else if (pendings.length > 0) {
-        run.skipped(group);
-    } else {
-        run.passed(group, duration);
+    trace: {
+        traceback: string
     }
 };
 
-export const executor = async (ctrl: TestController, request: TestRunRequest, token: CancellationToken) => {
+type SuiteResults = {
+    successes: TestResults[],
+    failures: TestResults[],
+    pendings: TestResults[],
+    errors: TestResults[],
+    duration: number
+};
 
-    const run = ctrl.createTestRun(request);
-    const _queue: TestItem[] = [];
+function updateTestResults(
+    result: TestResults,
+    status: TestStatus,
+    run: vscode.TestRun,
+    suite: vscode.TestItem
+) {
+    const test = getChildCase(suite, result.name);
+    if (!test) { return; }
 
-    if (request.include) {
-        request.include.forEach((test) => _queue.push(test));
-    } else {
-        ctrl.items.forEach((test) => _queue.push(test));
+    const duration = 1000 * result.element.duration;
+    const message = new vscode.TestMessage(result.message);
+
+    switch (status) {
+        case 'success':
+            run.passed(test, duration);
+            break;
+        case 'pending':
+            run.skipped(test);
+            break;
+        case 'failure':
+            run.failed(test, message, duration);
+            break;
+        case 'error':
+            run.errored(test, message, duration);
+            break;
+    }
+}
+
+function updateAllResults(
+    results: SuiteResults,
+    run: vscode.TestRun,
+    suite: vscode.TestItem
+) {
+    for (const result of results.successes) {
+        updateTestResults(result, 'success', run, suite);
     }
 
-    // TODO: Implement a better alternative to this algorithm.
-    const queue = [];
-    for (const item of _queue) {
-        run.enqueued(item);
-        if (item.uri?.path.includes('.lua')) {
-            queue.push(item);
-            item.children.forEach(child => run.enqueued(child));
-            continue;
-        }
-        item.children.forEach(child => _queue.push(child));
+    for (const result of results.failures) {
+        updateTestResults(result, 'failure', run, suite);
     }
 
-    const runTestFile = async (test: TestItem) => {
+    for (const result of results.pendings) {
+        updateTestResults(result, 'pending', run, suite);
+    }
 
-        // TODO: Review the need for these check guards.
-        if (request.exclude?.includes(test) || token.isCancellationRequested) {
-            return;
-        }
+    for (const result of results.errors) {
+        updateTestResults(result, 'error', run, suite);
+    }
+}
 
-        if (!test.uri) {
-            console.log("Uri not found for test");
-            return;
-        }
+function updateSuiteResults(
+    results: SuiteResults,
+    run: vscode.TestRun,
+    suite: vscode.TestItem
+) {
+    const duration = 1000 * results.duration;
+    const message = new vscode.TestMessage("");
 
-        // TODO: This promise could be handled better.
-        return new Promise<void>((resolve, reject) => {
+    if (results.errors.length > 0) {
+        return run.errored(suite, message, duration);
+    }
+    if (results.failures.length > 0) {
+        return run.failed(suite, message, duration);
+    }
+    if (results.pendings.length > 0) {
+        return run.skipped(suite);
+    }
+    if (results.successes.length > 0) {
+        return run.passed(suite, duration);
+    }
+    run.skipped(suite);
+};
 
-            const cwd = vscode.workspace.getWorkspaceFolder(test.uri!);
-            const options = { cwd: cwd!.uri.path };
-            const child = spawn('busted', ['-o', 'json', test.uri!.path], options);
+function runTestSuite(
+    context: vscode.ExtensionContext,
+    workspace: vscode.WorkspaceFolder,
+    run: vscode.TestRun,
+    token: vscode.CancellationToken,
+    suite: vscode.TestItem,
+) {
+    return new Promise<void>((resolve) => {
 
-            token.onCancellationRequested(child.kill);
+        const child = createBustedProcess(context, workspace, 'json', suite.uri!);
 
-            // TODO: There may probably be other alternatives to buffering stdout.
-            let output = "";
-            child.stdout.on('data', data => { output += data; });
+        token.onCancellationRequested(() => child.kill());
 
-            child.stderr.on('data', data => { console.error(data); });
+        let output = "";
+        child.stdout.on('data', (data) => { output += data; });
 
-            child.on('error', error => {
-                vscode.window.showErrorMessage(error.message);
-            });
-
-            child.on('close', code => {
-                if (child.killed) {
-                    return;
-                }
-                try {
-                    const results = JSON.parse(output);
-                    updateRunResults(results, run, test);
-                } catch {
-                    const message = new TestMessage("Error parsing json input.");
-                    run.errored(test, message);
-                    vscode.window.showErrorMessage(`${test.id}: ${message.message}`);
-                }
-                resolve();
-            });
-
-            run.started(test);
+        child.on('close', (code) => {
+            if (child.killed) { return resolve(); }
+            try {
+                const results = JSON.parse(output) as SuiteResults;
+                updateAllResults(results, run, suite);
+                updateSuiteResults(results, run, suite);
+            } catch {
+                const message = "Error parsing json input.";
+                run.errored(suite, new vscode.TestMessage(message));
+            }
+            resolve();
         });
+
+        run.started(suite);
+    });
+}
+
+function createQueueRecurse(
+    run: vscode.TestRun,
+    queue: vscode.TestItem[],
+    item: vscode.TestItem
+) {
+    if (item.uri?.path.endsWith('.lua')) {
+        run.enqueued(item);
+        queue.push(item);
+        return;
+    }
+    item.children.forEach(
+        child => createQueueRecurse(run, queue, child)
+    );
+}
+
+function createQueue(
+    ctrlTest: vscode.TestController,
+    run: vscode.TestRun,
+    request: vscode.TestRunRequest,
+) {
+    const exclude = request.exclude ?? [];
+    const candidates = request.include ?? ctrlTest.items;
+    const queue = [] as vscode.TestItem[];
+
+    candidates.forEach(item => createQueueRecurse(run, queue, item));
+    return queue.filter(item => !exclude.includes(item));
+}
+
+async function testRunner(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController,
+    request: vscode.TestRunRequest,
+    token: vscode.CancellationToken
+) {
+    const run = ctrlTest.createTestRun(request);
+    const queue = createQueue(ctrlTest, run, request);
+
+    const runTestFile = (suite: vscode.TestItem) => {
+        const workspace = vscode.workspace.getWorkspaceFolder(suite.uri!);
+        return runTestSuite(context, workspace!, run, token, suite);
     };
 
-    // Run tests files sequencially
-    // for (const test of queue) { await runTestFile(test); }
-
-    // Run tests files concurrently
-    await Promise.allSettled(queue.map(runTestFile));
+    const execution = context.globalState.get('execution', 'sequential');
+    if (execution === 'sequential') {
+        for (const test of queue) {
+            await runTestFile(test);
+        }
+    } else {
+        await Promise.allSettled(queue.map(runTestFile));
+    }
 
     run.end();
-};
+}
+
+export function createTestRunner(
+    context: vscode.ExtensionContext,
+    ctrlTest: vscode.TestController
+) {
+    return (request: vscode.TestRunRequest, token: vscode.CancellationToken) => {
+        return testRunner(context, ctrlTest, request, token);
+    };
+}

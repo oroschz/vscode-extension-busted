@@ -1,41 +1,36 @@
 import * as vscode from 'vscode';
-import { resolver, parseTestNode, getTestNode, dropTestNode } from './resolve';
-import { executor } from './execute';
+import { createTestResolver } from "./resolve";
+import { createTestRunner } from './execute';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+    vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("busted-tests")) {
+            context.subscriptions.forEach(item => item.dispose());
+        }
+        configure(context);
+    });
 
-    const controller = vscode.tests.createTestController('busted-tests', 'Busted Tests');
-    context.subscriptions.push(controller);
+    await configure(context);
+}
 
-    controller.resolveHandler = resolver(context, controller);
+async function configure(context: vscode.ExtensionContext) {
 
-    const parseTestsInDocument = (textDoc: vscode.TextDocument) => {
-        if (textDoc.uri.scheme !== 'file') { return; }
-        if (!textDoc.uri.path.endsWith('_spec.lua')) { return; }
-        parseTestNode(controller, getTestNode(controller, textDoc.uri));
-    };
+    const config = vscode.workspace.getConfiguration('busted-tests');
+    await context.globalState.update('prefix', config.get('pattern.prefix'));
+    await context.globalState.update('suffix', config.get('pattern.suffix'));
+    await context.globalState.update('program', config.get('execution.program'));
+    await context.globalState.update('execution', config.get('execution.mode'));
 
-    context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(parseTestsInDocument),
-        vscode.workspace.onDidChangeTextDocument(
-            event => parseTestsInDocument(event.document)
-        )
-    );
+    const ctrlTest = vscode.tests.createTestController('busted-tests', 'Busted Tests');
+    context.subscriptions.push(ctrlTest);
 
-    // Covers the case of test modules deletion from within VSCode.
-    context.subscriptions.push(
-        vscode.workspace.onDidDeleteFiles(
-            event => event.files.forEach(file => dropTestNode(controller, file))
-        )
-    );
+    ctrlTest.resolveHandler = createTestResolver(context, ctrlTest);
 
-    const runHandler = (
-        request: vscode.TestRunRequest,
-        token: vscode.CancellationToken) => executor(controller, request, token);
+    const runnerTest = createTestRunner(context, ctrlTest);
 
     context.subscriptions.push(
-        controller.createRunProfile('Run', vscode.TestRunProfileKind.Run, runHandler),
-        controller.createRunProfile('Debug', vscode.TestRunProfileKind.Debug, runHandler)
+        ctrlTest.createRunProfile('Run', vscode.TestRunProfileKind.Run, runnerTest),
+        ctrlTest.createRunProfile('Debug', vscode.TestRunProfileKind.Debug, runnerTest)
     );
 }
 
