@@ -5,7 +5,7 @@ All notable changes to the "busted-tests" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2022-05-19
 
 ### Added
 
@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use more useful messages on test output, instead of just the test traceback.
 - Update README.md to include information about requirements, installation and license.
 - Change screenshot included in the documentation.
+- Update package.json information on new repo name 'vscode-extension-busted'.
 
 ### Fixed
 
