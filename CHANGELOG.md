@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Configure path/command to use in order to run 'busted'.
+- Select between 'concurrent' and 'sequential' execution modes in the configuration.
+- Customize prefix and suffix patterns for test files lookup.
+
 ### Changed
 
 - Replace extension icon for improved visibility on dark backgrounds.

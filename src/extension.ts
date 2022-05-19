@@ -3,11 +3,23 @@ import { createTestResolver } from "./resolve";
 import { createTestRunner } from './execute';
 
 export async function activate(context: vscode.ExtensionContext) {
+    vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("busted-tests")) {
+            context.subscriptions.forEach(item => item.dispose());
+        }
+        configure(context);
+    });
 
-    await context.globalState.update('prefix', 'spec/**');
-    await context.globalState.update('suffix', '_spec.lua');
-    await context.globalState.update('program', 'busted');
-    await context.globalState.update('execution', 'concurrent');
+    await configure(context);
+}
+
+async function configure(context: vscode.ExtensionContext) {
+
+    const config = vscode.workspace.getConfiguration('busted-tests');
+    await context.globalState.update('prefix', config.get('pattern.prefix'));
+    await context.globalState.update('suffix', config.get('pattern.suffix'));
+    await context.globalState.update('program', config.get('execution.program'));
+    await context.globalState.update('execution', config.get('execution.mode'));
 
     const ctrlTest = vscode.tests.createTestController('busted-tests', 'Busted Tests');
     context.subscriptions.push(ctrlTest);
