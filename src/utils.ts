@@ -19,7 +19,7 @@ export function getTestCaseId(uri: vscode.Uri, label: string) {
 
 export const getChildCase = (group: vscode.TestItem, label: string) => {
     const caseId = getTestCaseId(group.uri!, label);
-    return group.children.get(caseId);
+    return group.children.get(caseId) ?? (group.id === caseId ? group : undefined);
 };
 
 export function tokenizePath(
