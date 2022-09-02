@@ -117,7 +117,9 @@ function runTestSuite(
             try {
                 const results = JSON.parse(output) as SuiteResults;
                 updateAllResults(results, run, suite);
-                updateSuiteResults(results, run, suite);
+                if (suite.children.size !== 0){
+                    updateSuiteResults(results, run, suite);
+                }
             } catch {
                 const message = "Error parsing json input.";
                 run.errored(suite, new vscode.TestMessage(message));
