@@ -28,7 +28,7 @@ export function tokenizePath(
 ) {
     const root = path.dirname(workspace.uri.path);
     const relativePath = path.relative(root, uri.path);
-    const tokens = relativePath.split("/");
+    const tokens = relativePath.split(path.sep);
 
     return { root, tokens };
 }
