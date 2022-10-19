@@ -17,8 +17,8 @@ export function createBustedProcess(
     uri: vscode.Uri
 ) {
     const program = context.globalState.get('program', 'busted');
-    const args = [uri.path, ...executionArguments(mode)];
-    const options = { 'cwd': workspace.uri.path };
+    const args = [uri.fsPath, ...executionArguments(mode)];
+    const options = { 'cwd': workspace.uri.fsPath };
 
     return spawn(program, args, options);
 }
